@@ -1,80 +1,182 @@
+const http = require('http');
 const fs = require('fs');
-const bodyParser = require('body-parser')
-const compression = require('compression')
-const topicRouter = require('./routes/topic.js')
-const indexRouter = require('./routes/index.js')
-const helmet = require('helmet')
-const express = require('express')
-const app = express()
-const port = 3000
-
-// route, touting
-// 최신 문법
-// app.get('/', (req, res) => {
-//   res.send('Hello World!')
-// })
-
-// parse application/x-www-form-urlencoded
-app.use(express.static('public'));
-// 이미지 파일 가져오기 디렉토리 위치 설정
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(compression());
-app.get('*', function(request, response, next){
-  fs.readdir('./data', function(error, filelist){
-    request.list = filelist;
-    next();
-  });
+const url = require('url');
+const qs = require('querystring');
+const template = require('./lib/template.js');
+const path = require('path');
+const sanitizeHtml = require('sanitize-html');
+const mysql      = require('mysql');
+const db = mysql.createConnection({
+  host     : 'localhost',
+  user     : 'root',
+  password : '111111',
+  database : 'opentutorials'
 });
-app.use('/', indexRouter)
-// index
-app.use('/topic', topicRouter)
-// topic 폴더에 기존 CUD 코드를 옮김 파일 분리
-app.use(helmet())
+db.connect();
 
-app.use(function(req, res, next) {
-  res.status(404).send('Sorry cant find that!');
+
+const app = http.createServer(function(request,response){
+    const _url = request.url;
+    const queryData = url.parse(_url, true).query;
+    const pathname = url.parse(_url, true).pathname;
+    if(pathname === '/'){
+      if(queryData.id === undefined){
+        db.query(`SELECT * FROM topic`, function(error, topics){
+          // console.log(topics);
+          const title = 'Welcome';
+          const description = 'Hello, Node.js';
+          const list = template.list(topics);
+          const html = template.HTML(title, list,
+          `<h2>${title}</h2>${description}`,
+          `<a href="/create">create</a>`
+          );
+
+          response.writeHead(200);
+          response.end(html);
+        });
+      } else {
+        /*
+        fs.readdir('./data', function(error, filelist){
+          const filteredId = path.parse(queryData.id).base;
+          fs.readFile(`data/${filteredId}`, 'utf8', function(err, description){
+            const title = queryData.id;
+            const sanitizedTitle = sanitizeHtml(title);
+            const sanitizedDescription = sanitizeHtml(description, {
+              allowedTags:['h1']
+            });
+            const list = template.list(filelist);
+            const html = template.HTML(sanitizedTitle, list,
+              `<h2>${sanitizedTitle}</h2>${sanitizedDescription}`,
+              ` <a href="/create">create</a>
+                <a href="/update?id=${sanitizedTitle}">update</a>
+                <form action="delete_process" method="post">
+                  <input type="hidden" name="id" value="${sanitizedTitle}">
+                  <input type="submit" value="delete">
+                </form>`
+            );
+            response.writeHead(200);
+            response.end(html);
+          });
+        });
+        */
+       db.query(`SELECT * FROM topic`, function(error, topics){
+        // console.log(topics);
+        if(error){
+          throw error;
+        }
+         db.query(`SELECT * FROM topic WHERE id=?`, [queryData.id], function(error2, topic){
+          if(error2){
+            throw error2;
+          }
+          // topic 데이터 가져오기 list
+        const title = topic[0].title;
+        const description = topic[0].description;
+        const list = template.list(topics);
+        const html = template.HTML(title, list,
+        `<h2>${title}</h2>${description}`,
+        `<a href="/create">create</a>
+        <a href="/update?id=${queryData.id}">update</a>
+        <form action="delete_process" method="post">
+          <input type="hidden" name="id" value="${queryData.id}">
+          <input type="submit" value="delete">
+        </form>`
+        );
+        response.writeHead(200);
+        response.end(html);
+        });
+      });
+      }
+    } else if(pathname === '/create'){
+      fs.readdir('./data', function(error, filelist){
+        const title = 'WEB - create';
+        const list = template.list(filelist);
+        const html = template.HTML(title, list, `
+          <form action="/create_process" method="post">
+            <p><input type="text" name="title" placeholder="title"></p>
+            <p>
+              <textarea name="description" placeholder="description"></textarea>
+            </p>
+            <p>
+              <input type="submit">
+            </p>
+          </form>
+        `, '');
+        response.writeHead(200);
+        response.end(html);
+      });
+    } else if(pathname === '/create_process'){
+      let body = '';
+      request.on('data', function(data){
+          body = body + data;
+      });
+      request.on('end', function(){
+          const post = qs.parse(body);
+          const title = post.title;
+          const description = post.description;
+          fs.writeFile(`data/${title}`, description, 'utf8', function(err){
+            response.writeHead(302, {Location: `/?id=${title}`});
+            response.end();
+          })
+      });
+    } else if(pathname === '/update'){
+      fs.readdir('./data', function(error, filelist){
+        const filteredId = path.parse(queryData.id).base;
+        fs.readFile(`data/${filteredId}`, 'utf8', function(err, description){
+          const title = queryData.id;
+          const list = template.list(filelist);
+          const html = template.HTML(title, list,
+            `
+            <form action="/update_process" method="post">
+              <input type="hidden" name="id" value="${title}">
+              <p><input type="text" name="title" placeholder="title" value="${title}"></p>
+              <p>
+                <textarea name="description" placeholder="description">${description}</textarea>
+              </p>
+              <p>
+                <input type="submit">
+              </p>
+            </form>
+            `,
+            `<a href="/create">create</a> <a href="/update?id=${title}">update</a>`
+          );
+          response.writeHead(200);
+          response.end(html);
+        });
+      });
+    } else if(pathname === '/update_process'){
+      let body = '';
+      request.on('data', function(data){
+          body = body + data;
+      });
+      request.on('end', function(){
+          const post = qs.parse(body);
+          const id = post.id;
+          const title = post.title;
+          const description = post.description;
+          fs.rename(`data/${id}`, `data/${title}`, function(error){
+            fs.writeFile(`data/${title}`, description, 'utf8', function(err){
+              response.writeHead(302, {Location: `/?id=${title}`});
+              response.end();
+            })
+          });
+      });
+    } else if(pathname === '/delete_process'){
+      let body = '';
+      request.on('data', function(data){
+          body = body + data;
+      });
+      request.on('end', function(){
+          const post = qs.parse(body);
+          const id = post.id;
+          const filteredId = path.parse(id).base;
+          fs.unlink(`data/${filteredId}`, function(error){
+            response.writeHead(302, {Location: `/`});
+            response.end();
+          })
+      });
+    } else {
+      response.writeHead(404);
+      response.end('Not found');
+    }
 });
-
-app.use(function (err, req, res, next) {
-  console.error(err.stack)
-  res.status(500).send('Something broke!')
-})
-
-app.listen(port, () => {
-  console.log(`Example app listening at http://localhost:${port}`)
-})
-
-// const http = require('http');
-// const fs = require('fs');
-// const url = require('url');
-// const qs = require('querystring');
-// const template = require('./lib/template.js');
-// // nodejs path parse search
-// const path = require('path');
-// const sanitizeHtml = require('sanitize-html');
-
-// const app = http.createServer(function(request,response){
-//     // request 요청할 때 웹 브라우저가 보낸 정보
-//     // response 응답할 때 우리가 웹 브라우저에 전송할 정보
-//     const _url = request.url;
-//     const queryData = url.parse(_url, true).query;
-//     const pathname = url.parse(_url, true).pathname;
-//     // console.log(pathname);
-//     if(pathname === '/'){
-//       if(queryData.id === undefined){
-//       } 
-//       }
-//     } else if(pathname === '/create'){
-//     } else if(pathname === '/create_process') {
-//     } else if(pathname === '/update'){
-//       // nodejs file write search
-//     } else if(pathname === '/update_process') {
-//       });
-//       // Nodejs delete file search
-//     } else if(pathname === '/delete_process') {
-//     } else {
-//       response.writeHead(404);
-//       response.end('Not found');
-//     }
-// });
-// app.listen(3000);
+app.listen(3000);
