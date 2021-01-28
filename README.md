@@ -33,3 +33,10 @@ npm 설치
    - update 부분 sql로 변경
 5. Node.js & Mysql 글 삭제 기능 구현
    - delete 부분 sql로 변경
+6. Node.js & Mysql 작성자가 누군지 구현
+   - 상세보기 부분에서 LEFT JOIN author On topic.author_id=author.id WHERE topic.id=? 삽입
+   - 보기 위하여
+   ```js
+   <p>by ${topic[0].name}</p>
+   ```
+   작성
