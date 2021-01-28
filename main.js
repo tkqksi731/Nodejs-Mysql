@@ -87,23 +87,29 @@ const app = http.createServer(function(request,response){
       });
       }
     } else if(pathname === '/create'){
-      fs.readdir('./data', function(error, filelist){
-        const title = 'WEB - create';
-        const list = template.list(filelist);
-        const html = template.HTML(title, list, `
-          <form action="/create_process" method="post">
-            <p><input type="text" name="title" placeholder="title"></p>
-            <p>
-              <textarea name="description" placeholder="description"></textarea>
-            </p>
-            <p>
-              <input type="submit">
-            </p>
-          </form>
-        `, '');
-        response.writeHead(200);
-        response.end(html);
-      });
+    db.query(`SELECT * FROM topic`, function(error, topics){
+      // console.log(topics);
+      const title = 'Create';
+      const list = template.list(topics);
+      const html = template.HTML(title, list,
+    `
+    <form action="/create_process" method="post">
+      <p><input type="text" name="title" placeholder="title"></p>
+      <p>
+        <textarea name="description" placeholder="description"></textarea>
+      </p>
+      <p>
+        <input type="submit">
+      </p>
+    </form>
+    `,
+      `<a href="/create">create</a>`
+    );
+
+      response.writeHead(200);
+      response.end(html);
+    });
+
     } else if(pathname === '/create_process'){
       let body = '';
       request.on('data', function(data){
@@ -111,12 +117,19 @@ const app = http.createServer(function(request,response){
       });
       request.on('end', function(){
           const post = qs.parse(body);
-          const title = post.title;
-          const description = post.description;
-          fs.writeFile(`data/${title}`, description, 'utf8', function(err){
-            response.writeHead(302, {Location: `/?id=${title}`});
+          db.query(`
+          INSERT INTO topic (title, description, created, author_id)
+            VALUES(?, ?, NOW(), ?)`,
+          [post.title, post.description, 1],
+          function(error, result){
+            if(error){
+              throw error;
+            }
+            response.writeHead(302, {Location: `/?id=${result.insertId}`});
+            // mysql nodejs 검색
             response.end();
-          })
+          }
+          )
       });
     } else if(pathname === '/update'){
       fs.readdir('./data', function(error, filelist){
