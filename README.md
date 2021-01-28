@@ -31,3 +31,5 @@ npm 설치
    - create 부분 sql로 변경
 4. Node.js & Mysql 글 수정 기능 구현
    - update 부분 sql로 변경
+5. Node.js & Mysql 글 삭제 기능 구현
+   - delete 부분 sql로 변경
