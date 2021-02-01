@@ -41,3 +41,28 @@ npm 설치
    ```
    작성
 7. Node.js & Mysql JOIN 글 생성 구현
+   - db 부분에서 author의 id, name를 넣어 create버튼을 누를 시 하단에 목록으로 egoing, duru, teaho가 나옴
+   - template 부분에서 제일 하단 부분에 ,를 넣고 밑에 코드를 삽입
+   ```js
+   ,authorSelect:function(author){
+    let tag = '';
+    let i = 0;
+    while(i < author.length){
+      tag += `<option value="${author[i].id}">${author[i].name}</option>`;
+      i++;
+    }
+    return `
+    <select name="author">
+    ${tag}
+    </select>
+    `
+   ```
+8. Node.js & Mysql JOIN 글 수정 구현
+   - update 부분에 db.query(... author) 을 가져와 기존의 코드를 {}안으로 변경
+   - template에서 while 부분(authorSelect:function(author){})에 밑에 코드를 삽입
+   ```js
+   let selected = "";
+   if (authors[i].id === author_id) {
+     selected = " selected";
+   }
+   ```
