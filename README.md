@@ -40,3 +40,4 @@ npm 설치
    <p>by ${topic[0].name}</p>
    ```
    작성
+7. Node.js & Mysql JOIN 글 생성 구현
